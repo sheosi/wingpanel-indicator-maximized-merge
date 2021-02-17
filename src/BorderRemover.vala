@@ -1,7 +1,9 @@
 private class BorderRemover {
 
+    private class Empty{} // Just a stub for hash tables
+
     private XConn conn;
-    private GLib.Array<Xcb.Window> handled;
+    private GLib.HashTable<Xcb.Window, Empty> handled;
     private GLib.List<GLib.Regex> passlist;
     private GLib.List<GLib.Regex> blocklist;
 
@@ -26,31 +28,6 @@ private class BorderRemover {
         }
 
         return res;
-    }
-
-    private static bool contains(ref GLib.Array<Xcb.Window> array, Xcb.Window val) {
-        for(var i = 0; i < array.length; i++) {
-            if (array.index(i) == val) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static void remove_val(ref GLib.Array<Xcb.Window> array, Xcb.Window val) {
-        var found = false;
-        var index = 0;
-        for(var i = 0; i < array.length; i++) {
-            if (array.index(i) == val) {
-                index = i;
-                break;
-            }
-        }
-
-        if (found) {
-            array.remove_index(index);
-        }
-        
     }
     private bool any_matches(ref GLib.List<GLib.Regex> list, string target) {
         foreach(var reg in list) {
@@ -84,20 +61,30 @@ private class BorderRemover {
     }
 
     private bool match(XConn conn, Xcb.Window win) throws XcbError {
-        var type = conn.get_property_atom(win, atom_type);
-        var is_normal = type == atom_normal;
-        var target = make_class_name(conn, win);
-        
-        var in_passlist = passlist.length() == 0 || any_matches(ref passlist, target);
-        var not_in_blocklist = blocklist.length() == 0 || all_dont_match(ref blocklist, target);
-        
-        return (is_normal && in_passlist && not_in_blocklist);
+        try {
+            var type = conn.get_property_atom(win, atom_type);
+            var is_normal = type == atom_normal;
+            var target = make_class_name(conn, win);
+            
+            var in_passlist = passlist.length() == 0 || any_matches(ref passlist, target);
+            var not_in_blocklist = blocklist.length() == 0 || all_dont_match(ref blocklist, target);
+            return (is_normal && in_passlist && not_in_blocklist);
+        }
+        catch (XcbError e) {
+            // This just means that the window doesn't exist, happens when
+            // a window is destroyed because it is being unmapped
+            if (e.code == XcbError.BADWINDOW) {
+                return false;
+            }
+            else {
+                throw e;
+            }
+        }
     }
 
     private void hide(XConn conn, Xcb.Window win) throws XcbError {
-        if (!contains(ref handled, win) && match(conn, win)) {
-            //var hide = conn.get_property_atom(win, atom_hide);
-            handled.append_val(win);
+        if (!handled.contains(win) && match(conn, win)) {
+            handled.insert(win, new Empty());
             conn.change_property_cardinal(win, atom_hide, 1);
         }
     }
@@ -109,34 +96,22 @@ private class BorderRemover {
     }
 
     private void handle(XConn conn, ref Xcb.GenericEvent event) throws XcbError{
-        stderr.printf("Handling!\n");
         var type = event.response_type & ~0x80;
         switch (type) {
-            case ResponseType.CREATE_NOTIFY:{
-                stderr.printf("Created!\n");
+            case ResponseType.CREATE_NOTIFY: {
                 var cr_event = ((Xcb.CreateNotifyEvent*) event);
                 var win = cr_event->window;
-                conn.change_window_attributes(win, Xcb.CW.EVENT_MASK , new uint32[Xcb.EventMask.STRUCTURE_NOTIFY]);
-                break;
-            }
-            case ResponseType.MAP_NOTIFY: {
-                var map_event = ((Xcb.MapNotifyEvent*) event);
-                var win = map_event->window;
                 hide(conn, win);
                 break;
             }
-            case ResponseType.DESTROY_NOTIFY:{
+            case ResponseType.DESTROY_NOTIFY: {
                 var ds_event = ((Xcb.DestroyNotifyEvent*) event);
                 var win = ds_event->window;
-                remove_val(ref handled, win);
+                handled.remove(win);
                 break;
             }
         }
     }
-
-    /*private void unhide(XConn conn, Xcb.Window win, prev_value) {
-        //conn.dele
-    }*/
 
     private BorderRemover(owned XConn _conn, Xcb.Atom _atom_hide, Xcb.Atom _atom_type, Xcb.Atom _atom_normal) {
         conn = _conn;
@@ -149,7 +124,8 @@ private class BorderRemover {
 
         passlist = parse_env_list("MAXIMIZED_MERGE_PASSLIST");
         blocklist = parse_env_list("MAXIMIZED_MERGE_BLOCKLIST");
-        handled = new GLib.Array<Xcb.Window>();
+        handled = new GLib.HashTable<Xcb.Window, Empty>(win_hash, win_equal);
+        handled.insert(0, new Empty());
 
         // Hide everything
         try {
@@ -157,14 +133,13 @@ private class BorderRemover {
                 try {
                     hide(conn, win);
                 }catch(XcbError e) {
-                    stderr.printf(@"$(e.message)");
+                    stderr.printf(@"$(e.message)\n");
                 }
-                var t = new uint32[Xcb.EventMask.SUBSTRUCTURE_NOTIFY];
+                const uint32[] t = {Xcb.EventMask.SUBSTRUCTURE_NOTIFY};
                 conn.change_window_attributes(root, Xcb.CW.EVENT_MASK, t);
-                stdout.printf(@"$(t[0])");
             }
         } catch(XcbError e) {
-            stderr.printf(@"$(e.message)");
+            stderr.printf(@"$(e.message)\n");
         }
         
      }
@@ -172,12 +147,11 @@ private class BorderRemover {
      public void poll() {
         var ev = conn.poll_for_event();
         while(ev != null) {
-            stdout.printf(@"found event\n");
             try{
                 var  ev_ = (!)ev;
                 handle(conn,ref ev_);
             }catch(XcbError e) {
-                stderr.printf(@"$(e.message)");
+                stderr.printf(@"Error while handling: $(e.message)\n");
             }
             
             ev = conn.poll_for_event();
@@ -194,10 +168,18 @@ private class BorderRemover {
             return new BorderRemover(conn, atom_hide, atom_type, atom_normal);
         }
         catch (XcbError e) {
-            stderr.printf(@"$(e.message)");
+            stderr.printf(@"$(e.message)\n");
         }
         return null;
         
-     }
- }
+    }
+     
+}
 
+public uint win_hash(Xcb.Window win) {
+    return int_hash((int)win);
+}
+
+public bool win_equal(Xcb.Window a, Xcb.Window b) {
+    return a == b;
+}

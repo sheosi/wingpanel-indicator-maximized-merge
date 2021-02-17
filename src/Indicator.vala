@@ -71,7 +71,7 @@
             });
         }
         else {
-            stderr.printf ("Couldn't init border_remover, titlebars wont be changed");
+            stderr.printf ("Couldn't init border_remover, titlebars wont be changed\n");
         }
     }
 

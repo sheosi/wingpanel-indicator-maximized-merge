@@ -1,3 +1,5 @@
+/** Just a wrapper with an Xcb.Connection, mostly makes Xcb play more according
+to vala rules (exceptions, enums and some ready made events) */
 private class XConn {
     private Xcb.Connection conn;
 
@@ -11,7 +13,7 @@ private class XConn {
            try {
                atom_name = get_atom("WM_NAME");
            }catch (XcbError e) {
-               stderr.printf(@"$(e.message)");
+               stderr.printf(@"$(e.message)\n");
            }
        }
 
@@ -19,7 +21,7 @@ private class XConn {
            try {
                atom_class = get_atom("WM_CLASS");
            }catch (XcbError e) {
-               stderr.printf(@"$(e.message)");
+               stderr.printf(@"$(e.message)\n");
            }
        }
        
@@ -30,13 +32,18 @@ private class XConn {
     private void throw_xcb_error(Xcb.GenericError e) throws XcbError {
 
         var msg = "";
+        
         switch (e.error_code) {
             case 2: msg = "BadValue"; break;
+            case 3: msg = "BadWindow"; break;
             case 5: msg = "BadAtom";break;
             default: msg = @"errcode: $(e.error_code)";break;
         }
-        
-       throw new XcbError.GENERIC(@"Xcb $msg\n");
+
+        switch (e.error_code) {
+            case 3: throw new XcbError.BADWINDOW(@"Xcb $msg\n");
+            default: throw new XcbError.GENERIC(@"Xcb $msg\n");
+        }
     }
 
     public Xcb.Atom get_atom(string atom_name)  throws XcbError {
@@ -216,5 +223,6 @@ private class XConn {
 
 public errordomain XcbError {
     GENERIC,
-    CANT_GET_ATOM
+    CANT_GET_ATOM,
+    BADWINDOW
 }
