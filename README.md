@@ -15,10 +15,16 @@ I want to thank the [maximal](https://github.com/crazygolem/maximal) script, sin
 Note: Right now you need to middle click on the indicator for it to close the window.
 
 ## Install, build and run
-
+On *elementaryOS*:
 ```bash
 # install elementary-sdk, meson and libwingpanel
 sudo apt install elementary-sdk meson libwingpanel-2.0-dev
+````
+On *Fedora*:
+```bash
+sudo dnf install meson granite-devel vala cmake wingpanel-devel
+```
+```
 # clone repository
 git clone https://github.com/sheosi/wingpanel-indicator-maximized-merge wingpanel-indicator-maximized-merge
 # cd to dir
@@ -31,6 +37,7 @@ sudo ninja install
 # restart switchboard to load your indicator
 pkill wingpanel -9
 ```
+
 
 ## Generating pot file
 
