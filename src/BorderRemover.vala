@@ -103,14 +103,22 @@ private class BorderRemover {
 
     private bool match(XConn conn, Xcb.Window win) throws XcbError {
         try {
+            // Some windows don't have a class (I'm looking at you, Spotify), 
+            // so we have to check whether they can be maximized vertically
             var actions = conn.get_property_atoms(win, atom_actions);
             var contains = array_contains(actions, atom_max_vert);
-
-            var target = make_class_name(conn, win);
             
-            var in_passlist = passlist.length() == 0 || any_matches(ref passlist, target);
-            var not_in_blocklist = blocklist.length() == 0 || all_dont_match(ref blocklist, target);
-            return ( contains && in_passlist && not_in_blocklist);
+            // Only perform name checking if the window can be maximized vertically
+            if (contains) {
+                var target = make_class_name(conn, win);
+                
+                var in_passlist = passlist.length() == 0 || any_matches(ref passlist, target);
+                var not_in_blocklist = blocklist.length() == 0 || all_dont_match(ref blocklist, target);
+                return (in_passlist && not_in_blocklist);
+            }
+            else {
+                return false;
+            }
         }
         catch (XcbError e) {
             // This just means that the window doesn't exist, happens when

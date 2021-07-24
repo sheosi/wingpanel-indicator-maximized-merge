@@ -61,16 +61,6 @@ private class XConn {
        }
    }
 
-   public Xcb.Atom get_property_atom(Xcb.Window win, Xcb.Atom atom) throws XcbError {
-       Xcb.GenericError? e = null;
-       var cookie = conn.get_property(false, win, atom, Xcb.AtomEnum.ATOM, 0,1024);
-       var reply = conn.get_property_reply(cookie, out e);
-       if (e!=null) {
-           throw_xcb_error((!)e);
-       }
-       return *((Xcb.Atom*)((!)reply).value());
-   }
-
    public Xcb.Atom[] get_property_atoms(Xcb.Window win, Xcb.Atom atom) throws XcbError {
     Xcb.GenericError? e = null;
     #if XCONN_FAST
