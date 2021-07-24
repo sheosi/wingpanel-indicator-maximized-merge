@@ -682,6 +682,9 @@
 		 private uint32 value_len;
 		 [CCode (cname = "xcb_get_property_value")]
 		 public unowned void *value ();
+		 public uint32 val_len{
+			 get{return value_len;}
+		}
 		 public string value_as_string () {
 			 GLib.assert (format == 8);
 			 return "%.*s".printf (value_len, value ());

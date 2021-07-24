@@ -10,6 +10,7 @@ wingpanel_dep = dependency('wingpanel-2.0')
 extra_vapis = join_paths(meson.current_source_dir(), 'vapis')
 add_project_arguments(['--vapidir', extra_vapis], language: 'vala')
 add_project_arguments('--enable-experimental-non-null', language: 'vala')
+add_global_arguments(['-D', 'XCONN_FAST'], language: 'vala')
 
 dependencies = [
     dependency('glib-2.0'),

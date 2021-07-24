@@ -3,13 +3,48 @@ private class BorderRemover {
     private class Empty{} // Just a stub for hash tables
 
     private XConn conn;
-    private GLib.HashTable<Xcb.Window, Empty> handled;
-    private GLib.List<GLib.Regex> passlist;
-    private GLib.List<GLib.Regex> blocklist;
+    private GLib.HashTable<Xcb.Window, Empty> handled; // Windows that have been treated
+    private GLib.List<GLib.Regex> passlist; // Force removal of titlebar
+    private GLib.List<GLib.Regex> blocklist; // Don't remove titlebar
 
-    private static Xcb.Atom atom_type;
+    // Variables representing X.Org's atoms
     private static Xcb.Atom atom_hide;
-    private static Xcb.Atom atom_normal;
+    private static Xcb.Atom atom_max_vert;
+    private static Xcb.Atom atom_actions;
+
+    private BorderRemover(owned XConn _conn, 
+        Xcb.Atom _atom_hide,
+        Xcb.Atom _atom_max_vert,
+        Xcb.Atom _atom_actions) {
+        conn = _conn;
+        var dpy = conn.setup.roots_iterator().data;
+        var root = dpy.root;
+
+        atom_hide = _atom_hide;
+        atom_max_vert = _atom_max_vert;
+        atom_actions = _atom_actions;
+
+        passlist = parse_env_list("MAXIMIZED_MERGE_PASSLIST");
+        blocklist = parse_env_list("MAXIMIZED_MERGE_BLOCKLIST");
+        handled = new GLib.HashTable<Xcb.Window, Empty>(win_hash, win_equal);
+        handled.insert(0, new Empty());
+
+        // Hide everything
+        try {
+            foreach(var win in conn.list_all_windows(root)) {
+                try {
+                    hide(conn, win);
+                }catch(XcbError e) {
+                    stderr.printf(@"Error on hide: $(e.message)\n");
+                }
+                const uint32[] t = {Xcb.EventMask.SUBSTRUCTURE_NOTIFY};
+                conn.change_window_attributes(root, Xcb.CW.EVENT_MASK, t);
+            }
+        } catch(XcbError e) {
+            stderr.printf(@"Error on hide: $(e.message)\n");
+        }
+        
+    }
 
     public static GLib.List<Regex> parse_env_list(string env_name) {
         var env_str = GLib.Environment.get_variable(env_name);
@@ -59,16 +94,26 @@ private class BorderRemover {
         var name = value_or(conn.get_name(win), "");
         return @"$(cls)::$(name)";
     }
+    
+    private bool array_contains(Xcb.Atom[] array, Xcb.Atom target) {
+        foreach(var a in array) {
+            if (a == target) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     private bool match(XConn conn, Xcb.Window win) throws XcbError {
         try {
-            var type = conn.get_property_atom(win, atom_type);
-            var is_normal = type == atom_normal;
+            var actions = conn.get_property_atoms(win, atom_actions);
+            var contains = array_contains(actions, atom_max_vert);
+
             var target = make_class_name(conn, win);
             
             var in_passlist = passlist.length() == 0 || any_matches(ref passlist, target);
             var not_in_blocklist = blocklist.length() == 0 || all_dont_match(ref blocklist, target);
-            return (is_normal && in_passlist && not_in_blocklist);
+            return ( contains && in_passlist && not_in_blocklist);
         }
         catch (XcbError e) {
             // This just means that the window doesn't exist, happens when
@@ -113,62 +158,32 @@ private class BorderRemover {
         }
     }
 
-    private BorderRemover(owned XConn _conn, Xcb.Atom _atom_hide, Xcb.Atom _atom_type, Xcb.Atom _atom_normal) {
-        conn = _conn;
-        var dpy = conn.setup.roots_iterator().data;
-        var root = dpy.root;
-
-        atom_hide = _atom_hide;
-        atom_type = _atom_type;
-        atom_normal = _atom_normal;
-
-        passlist = parse_env_list("MAXIMIZED_MERGE_PASSLIST");
-        blocklist = parse_env_list("MAXIMIZED_MERGE_BLOCKLIST");
-        handled = new GLib.HashTable<Xcb.Window, Empty>(win_hash, win_equal);
-        handled.insert(0, new Empty());
-
-        // Hide everything
-        try {
-            foreach(var win in conn.list_all_windows(root)) {
-                try {
-                    hide(conn, win);
-                }catch(XcbError e) {
-                    stderr.printf(@"$(e.message)\n");
-                }
-                const uint32[] t = {Xcb.EventMask.SUBSTRUCTURE_NOTIFY};
-                conn.change_window_attributes(root, Xcb.CW.EVENT_MASK, t);
-            }
-        } catch(XcbError e) {
-            stderr.printf(@"$(e.message)\n");
-        }
-        
-     }
-
-     public void poll() {
+    public void poll() {
         var ev = conn.poll_for_event();
         while(ev != null) {
             try{
                 var  ev_ = (!)ev;
                 handle(conn,ref ev_);
-            }catch(XcbError e) {
+            } catch(XcbError e) {
                 stderr.printf(@"Error while handling: $(e.message)\n");
             }
             
             ev = conn.poll_for_event();
         }
             
-     }
-     public static BorderRemover? make_instance() {
+    }
+    public static BorderRemover? make_instance() {
         var conn = new XConn();
         try {
             var atom_hide = conn.get_atom( "_GTK_HIDE_TITLEBAR_WHEN_MAXIMIZED");
-            var atom_type = conn.get_atom("_NET_WM_WINDOW_TYPE");
-            var atom_normal = conn.get_atom( "_NET_WM_WINDOW_TYPE_NORMAL");
+            var atom_max_vert = conn.get_atom("_NET_WM_ACTION_MAXIMIZE_VERT");
+            var atom_actions = conn.get_atom("_NET_WM_ALLOWED_ACTIONS");
         
-            return new BorderRemover(conn, atom_hide, atom_type, atom_normal);
+            return new BorderRemover(conn, (!)atom_hide, 
+            (!)atom_max_vert, (!)atom_actions);
         }
         catch (XcbError e) {
-            stderr.printf(@"$(e.message)\n");
+            stderr.printf(@"Error while make_instance: $(e.message)\n");
         }
         return null;
         

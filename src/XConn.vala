@@ -13,7 +13,7 @@ private class XConn {
            try {
                atom_name = get_atom("WM_NAME");
            }catch (XcbError e) {
-               stderr.printf(@"$(e.message)\n");
+               stderr.printf(@"Failed to get WM_NAME: $(e.message)\n");
            }
        }
 
@@ -21,7 +21,7 @@ private class XConn {
            try {
                atom_class = get_atom("WM_CLASS");
            }catch (XcbError e) {
-               stderr.printf(@"$(e.message)\n");
+               stderr.printf(@"Failed to get WM_CLASS: $(e.message)\n");
            }
        }
        
@@ -46,14 +46,19 @@ private class XConn {
         }
     }
 
-    public Xcb.Atom get_atom(string atom_name)  throws XcbError {
+    public Xcb.Atom? get_atom(string atom_name)  throws XcbError {
        Xcb.GenericError? e = null;
        var result = conn.intern_atom_reply(conn.intern_atom(true, atom_name), out e);
        if (e != null) {
            throw_xcb_error((!)e);
        }
-
-       return ((!)result).atom;
+       var atom = ((!)result).atom;
+       if (atom == Xcb.AtomEnum.NONE) {
+           return null;
+       }
+       else {
+        return atom;
+       }
    }
 
    public Xcb.Atom get_property_atom(Xcb.Window win, Xcb.Atom atom) throws XcbError {
@@ -66,95 +71,47 @@ private class XConn {
        return *((Xcb.Atom*)((!)reply).value());
    }
 
-   public string atom_to_string(Xcb.Atom atom) {
-       switch (atom) {
-           case Xcb.AtomEnum.ARC: {return "arc";}
-            case Xcb.AtomEnum.ATOM: {return "atom";}
-            case Xcb.AtomEnum.BITMAP: {return "bitmap";}
-            case Xcb.AtomEnum.CAP_HEIGHT: {return "cap_height";}
-            case Xcb.AtomEnum.CARDINAL: {return "cardinal";}
-            case Xcb.AtomEnum.COLORMAP: {return "colormap";}
-            case Xcb.AtomEnum.COPYRIGHT: {return "copyright";}
-            case Xcb.AtomEnum.CURSOR: {return "cursor";}
-            case Xcb.AtomEnum.CUT_BUFFER0: {return "cutBuffer0";}
-            case Xcb.AtomEnum.CUT_BUFFER1: {return "cutBuffer1";}
-            case Xcb.AtomEnum.CUT_BUFFER2: {return "cutBuffer2";}
-            case Xcb.AtomEnum.CUT_BUFFER3: {return "cutBuffer3";}
-            case Xcb.AtomEnum.CUT_BUFFER4: {return "cutBuffer4";}
-            case Xcb.AtomEnum.CUT_BUFFER5: {return "cutBuffer5";}
-            case Xcb.AtomEnum.CUT_BUFFER6: {return "cutBuffer6";}
-            case Xcb.AtomEnum.CUT_BUFFER7: {return "cutBuffer7";}
-            case Xcb.AtomEnum.DRAWABLE: {return "drawable";}
-            case Xcb.AtomEnum.END_SPACE: {return "endSpace";}
-            case Xcb.AtomEnum.FAMILY_NAME: {return "familyName";}
-            case Xcb.AtomEnum.FONT: {return "font";}
-            case Xcb.AtomEnum.FONT_NAME: {return "fontName";}
-            case Xcb.AtomEnum.FULL_NAME: {return "fullName";}
-            case Xcb.AtomEnum.INTEGER: {return "integer";}
-            case Xcb.AtomEnum.ITALIC_ANGLE:{return "italicAngle";}
-            case Xcb.AtomEnum.MAX_SPACE: {return "maxSpace";}
-            case Xcb.AtomEnum.MIN_SPACE: {return "minSpace";}
-            case Xcb.AtomEnum.NONE: {return "none";}
-            case Xcb.AtomEnum.NORM_SPACE: {return "normSpace";}
-            case Xcb.AtomEnum.NOTICE: {return "notice";}
-            case Xcb.AtomEnum.PIXMAP: {return "pixmap";}
-            case Xcb.AtomEnum.POINT: {return "point";}
-            case Xcb.AtomEnum.POINT_SIZE: {return "pointSize";}
-            case Xcb.AtomEnum.PRIMARY: {return "primary";}
-            case Xcb.AtomEnum.QUAD_WIDTH: {return "quadWidth";}
-            case Xcb.AtomEnum.RECTANGLE: {return "rectangle";}
-            case Xcb.AtomEnum.RESOLUTION: {return "resolution";}
-            case Xcb.AtomEnum.RESOURCE_MANAGER: {return "resourceManager";}
-            case Xcb.AtomEnum.RGB_BEST_MAP: {return "rgbBestMap";}
-            case Xcb.AtomEnum.RGB_BLUE_MAP: {return "rgbBlueMap";}
-            case Xcb.AtomEnum.RGB_COLOR_MAP: {return "rgbColorMap";}
-            case Xcb.AtomEnum.RGB_DEFAULT_MAP: {return "rgbDefaultMap";}
-            case Xcb.AtomEnum.RGB_GRAY_MAP: {return "rgbGrayMap";}
-            case Xcb.AtomEnum.RGB_GREEN_MAP: {return "rgbGreenMap";}
-            case Xcb.AtomEnum.RGB_RED_MAP: {return "rgbRedMap";}
-            case Xcb.AtomEnum.SECONDARY: {return "secondary";}
-            case Xcb.AtomEnum.STRIKEOUT_ASCENT: {return "strikeoutAscent";}
-            case Xcb.AtomEnum.STRIKEOUT_DESCENT: {return "strikeoutDescent";}
-            case Xcb.AtomEnum.STRING: {return "string";}
-            case Xcb.AtomEnum.SUBSCRIPT_X: {return "subscriptX";}
-            case Xcb.AtomEnum.SUBSCRIPT_Y: {return "subscriptY";}
-            case Xcb.AtomEnum.SUPERSCRIPT_X: {return "superscriptX";}
-            case Xcb.AtomEnum.SUPERSCRIPT_Y: {return "superscriptY";}
-            case Xcb.AtomEnum.UNDERLINE_POSITION: {return "underlinePosition";}
-            case Xcb.AtomEnum.UNDERLINE_THICKNESS: {return "underlineThickness";}
-            case Xcb.AtomEnum.VISUALID: {return "visualid";}
-            case Xcb.AtomEnum.WEIGHT: {return "weight";}
-            case Xcb.AtomEnum.WINDOW: {return "window";}
-            case Xcb.AtomEnum.WM_CLASS: {return "wmClass";}
-            case Xcb.AtomEnum.WM_CLIENT_MACHINE: {return "wmClientMachine";}
-            case Xcb.AtomEnum.WM_COMMAND: {return "wmCommand";}
-            case Xcb.AtomEnum.WM_HINTS: {return "wmHints";}
-            case Xcb.AtomEnum.WM_ICON_NAME: {return "wmIconName";}
-            case Xcb.AtomEnum.WM_ICON_SIZE: {return "wmIconSize";}
-            case Xcb.AtomEnum.WM_NAME: {return "wmName";}
-            case Xcb.AtomEnum.WM_NORMAL_HINTS: {return "wmNormalHints";}
-            case Xcb.AtomEnum.WM_SIZE_HINTS: {return "wmSizeHints";}
-            case Xcb.AtomEnum.WM_TRANSIENT_FOR: {return "wmTransientFor";}
-            case Xcb.AtomEnum.WM_ZOOM_HINTS: {return "wmZoomHints";}
-            case Xcb.AtomEnum.X_HEIGHT: {return "xHeight";}
-       }
-       return "";
+   public Xcb.Atom[] get_property_atoms(Xcb.Window win, Xcb.Atom atom) throws XcbError {
+    Xcb.GenericError? e = null;
+    #if XCONN_FAST
+        var cookie = conn.get_property_unchecked(false, win, atom, Xcb.AtomEnum.ATOM, 0,1024);
+    #else
+        var cookie = conn.get_property(false, win, atom, Xcb.AtomEnum.ATOM, 0,1024);
+    #endif
+    var reply = conn.get_property_reply(cookie, out e);
+
+    if (e!=null) {
+        throw_xcb_error((!)e);
+    }
+
+    unowned Xcb.Atom[] res = ((Xcb.Atom[])((!)reply).value());
+    res.length = (int) ((!)reply).val_len;
+    return res;
+   }
+
+   public string get_atom_name(Xcb.Atom atom) {
+       return ((!)conn.get_atom_name_reply(conn.get_atom_name(atom))).name;
    }
 
    public string? get_property_string(Xcb.Window win, Xcb.Atom atom) throws XcbError {
-       Xcb.GenericError? e = null;
-       var cookie = conn.get_property(false, win, atom, Xcb.AtomEnum.STRING, 0,255);
-       var reply = conn.get_property_reply(cookie, out e);
-       if (e!=null) {
-           throw_xcb_error((!)e);
+        Xcb.GenericError? e = null;
+        #if XCONN_FAST
+            var cookie = conn.get_property_unchecked(false, win, atom, Xcb.AtomEnum.STRING, 0,255);
+        #else
+            var cookie = conn.get_property(false, win, atom, Xcb.AtomEnum.STRING, 0,255);
+        #endif
+
+        var reply = conn.get_property_reply(cookie, out e);
+        if (e!=null) {
+            throw_xcb_error((!)e);
+            }
+        if (reply == null) {
+            return null;
         }
-       if (reply == null) {
-           return null;
-       }
-       if (((!)reply).type == Xcb.AtomEnum.NONE) {
-        return null;
-       }
-       return ((!)reply).value_as_string();
+        if (((!)reply).type == Xcb.AtomEnum.NONE) {
+            return null;
+        }
+        return ((!)reply).value_as_string();
 
    }
 
