@@ -3,7 +3,6 @@ private class BorderRemover {
     private class Empty{} // Just a stub for hash tables
 
     private XConn conn;
-    private GLib.HashTable<Xcb.Window, Empty> handled; // Windows that have been treated
     private GLib.List<GLib.Regex> passlist; // Force removal of titlebar
     private GLib.List<GLib.Regex> blocklist; // Don't remove titlebar
 
@@ -26,8 +25,6 @@ private class BorderRemover {
 
         passlist = parse_env_list("MAXIMIZED_MERGE_PASSLIST");
         blocklist = parse_env_list("MAXIMIZED_MERGE_BLOCKLIST");
-        handled = new GLib.HashTable<Xcb.Window, Empty>(win_hash, win_equal);
-        handled.insert(0, new Empty());
 
         // Hide everything
         try {
@@ -128,8 +125,7 @@ private class BorderRemover {
     }
 
     private void hide(XConn conn, Xcb.Window win) throws XcbError {
-        if (!handled.contains(win) && match(conn, win)) {
-            handled.insert(win, new Empty());
+        if (match(conn, win)) {
             conn.change_property_cardinal(win, atom_hide, 1);
         }
     }
@@ -147,12 +143,6 @@ private class BorderRemover {
                 var cr_event = ((Xcb.CreateNotifyEvent*) event);
                 var win = cr_event->window;
                 hide(conn, win);
-                break;
-            }
-            case ResponseType.DESTROY_NOTIFY: {
-                var ds_event = ((Xcb.DestroyNotifyEvent*) event);
-                var win = ds_event->window;
-                handled.remove(win);
                 break;
             }
         }
